@@ -908,7 +908,7 @@ class EpubWriter(object):
 
     def _write_container(self):
         container_xml = CONTAINER_XML % {'folder_name': self.book.FOLDER_NAME}
-        self.out.writestr(CONTAINER_PATH, container_xml)
+        self._writestr(CONTAINER_PATH, container_xml)
 
     def _write_opf_metadata(self, root):
         # This is really not needed
@@ -1079,7 +1079,7 @@ class EpubWriter(object):
     def _write_opf_file(self, root):
         tree_str = etree.tostring(root, pretty_print=True, encoding='utf-8', xml_declaration=True)
 
-        self.out.writestr('%s/content.opf' % self.book.FOLDER_NAME, tree_str)
+        self._writestr('%s/content.opf' % self.book.FOLDER_NAME, tree_str)
 
     def _write_opf(self):
         package_attributes = {'xmlns': NAMESPACES['OPF'],
@@ -1350,18 +1350,30 @@ class EpubWriter(object):
     def _write_items(self):
         for item in self.book.get_items():
             if isinstance(item, EpubNcx):
-                self.out.writestr('%s/%s' % (self.book.FOLDER_NAME, item.file_name), self._get_ncx())
+                self._writestr('%s/%s' % (self.book.FOLDER_NAME, item.file_name), self._get_ncx())
             elif isinstance(item, EpubNav):
-                self.out.writestr('%s/%s' % (self.book.FOLDER_NAME, item.file_name), self._get_nav(item))
+                self._writestr('%s/%s' % (self.book.FOLDER_NAME, item.file_name), self._get_nav(item))
             elif item.manifest:
-                self.out.writestr('%s/%s' % (self.book.FOLDER_NAME, item.file_name), item.get_content())
+                self._writestr('%s/%s' % (self.book.FOLDER_NAME, item.file_name), item.get_content())
             else:
-                self.out.writestr('%s' % item.file_name, item.get_content())
+                self._writestr('%s' % item.file_name, item.get_content())
+
+    def _writestr(self, zinfo_or_arcname, data, compress_type=zipfile.ZIP_DEFLATED, compresslevel=None):
+        if isinstance(zinfo_or_arcname, str):
+            zinfo_or_arcname = zipfile.ZipInfo(zinfo_or_arcname, self.out_ts)
+        self.out.writestr(zinfo_or_arcname, data, compress_type)
 
     def write(self):
+        if 'mtime' in self.options:
+            mtime = self.options['mtime']
+        else:
+            import datetime
+            mtime = datetime.datetime.now()
+        self.out_ts = (mtime.year, mtime.month, mtime.day, mtime.hour, mtime.minute, mtime.second)
+
         # check for the option allowZip64
         self.out = zipfile.ZipFile(self.file_name, 'w', zipfile.ZIP_DEFLATED)
-        self.out.writestr('mimetype', 'application/epub+zip', compress_type=zipfile.ZIP_STORED)
+        self._writestr('mimetype', 'application/epub+zip', compress_type=zipfile.ZIP_STORED)
 
         self._write_container()
         self._write_opf()
